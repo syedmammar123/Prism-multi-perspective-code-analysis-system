@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Review {
+  id              String          @id @default(uuid())
+  prNumber        Int
+  repoOwner       String
+  repoName        String
+  prTitle         String
+  prAuthor        String
+  status          ReviewStatus    @default(QUEUED)
+  overallScore    Float?
+  verdict         String?         // APPROVED / NEEDS_CHANGES / REJECTED
+  commentId       String?         // GitHub comment ID (for idempotency)
+  commentPosted   Boolean         @default(false)
+  rawDiff         String?         // Store the diff for debugging
+  findings        Finding[]
+  createdAt       DateTime        @default(now())
+  completedAt     DateTime?
+
+  @@unique([repoOwner, repoName, prNumber]) // Idempotency key
+}
+
+model Finding {
+  id              String          @id @default(uuid())
+  reviewId        String
+  review          Review          @relation(fields: [reviewId], references: [id])
+  agentType       AgentType       // QUALITY / SECURITY / PERFORMANCE
+  agentScore      Float
+  filePath        String
+  lineNumber      Int?
+  severity        Severity        // CRITICAL / HIGH / MEDIUM / LOW
+  title           String
+  description     String
+  suggestion      String?
+  createdAt       DateTime        @default(now())
+}
+
+model Guideline {
+  id              String          @id @default(uuid())
+  fileName        String
+  chunkIndex      Int
+  content         String
+  embedding       Unsupported("vector(384)")  // pgvector
+  createdAt       DateTime        @default(now())
+
+  @@map("guidelines")
+}
+
+enum ReviewStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AgentType {
+  QUALITY
+  SECURITY
+  PERFORMANCE
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
