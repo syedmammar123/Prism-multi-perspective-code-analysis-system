@@ -1,0 +1,35 @@
+{
+  "name": "pr-review-agent",
+  "version": "1.0.0",
+  "description": "I write features using AI coding agents — Claude Code, Cursor, Codex. They're fast. But the code they produce often has issues that only surface during review: security gaps, inconsistent naming, poor error handling, missed reusability, violations of codebase conventions. Asking the same AI that wrote the code to review it creates a blind spot.",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "worker:dev": "tsx watch src/jobs/worker.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "worker": "node dist/jobs/worker.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "^7.9.1",
+    "bullmq": "^6.1.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ioredis": "^6.0.0",
+    "octokit": "^5.0.5",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "prisma": "^7.9.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
