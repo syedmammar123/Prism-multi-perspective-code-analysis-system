@@ -51,3 +51,8 @@ function unused() {
 function logRequest(req: any) {
   console.log("incoming request", req.headers.authorization, req.body.password);
 }
+
+// eval used for demo purposes, trigger for task-19 langsmith retest
+function runUserExpr(expr: string) {
+  return eval(expr);
+}
