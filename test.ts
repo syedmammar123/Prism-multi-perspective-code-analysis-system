@@ -56,3 +56,7 @@ function logRequest(req: any) {
 function runUserExpr(expr: string) {
   return eval(expr);
 }
+
+function runUserExpr1(expr: string) {
+  return eval(expr);
+}
