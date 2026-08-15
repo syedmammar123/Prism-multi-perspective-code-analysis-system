@@ -54,5 +54,8 @@ export const config = {
     tracingEnabled: langsmithTracingEnabled,
     apiKey: process.env.LANGCHAIN_API_KEY,
     project: process.env.LANGCHAIN_PROJECT,
+    // Required as our LANGCHAIN_API_KEY is an org-scoped Service Key rather
+    // than a Personal Access Token.
+    workspaceId: process.env.LANGSMITH_WORKSPACE_ID,
   },
 };
