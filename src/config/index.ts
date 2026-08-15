@@ -23,6 +23,18 @@ if (missingVars.length > 0) {
   );
 }
 
+const langsmithTracingEnabled = process.env.LANGCHAIN_TRACING_V2 === 'true';
+
+if (
+  langsmithTracingEnabled &&
+  (!process.env.LANGCHAIN_API_KEY || !process.env.LANGCHAIN_PROJECT)
+) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    'LANGCHAIN_TRACING_V2 is true but LANGCHAIN_API_KEY and/or LANGCHAIN_PROJECT is missing — LangSmith tracing will not work.'
+  );
+}
+
 export const config = {
   port: Number(process.env.PORT),
   nodeEnv: process.env.NODE_ENV as string,
@@ -37,5 +49,10 @@ export const config = {
   groq: {
     apiKey: process.env.GROQ_API_KEY as string,
     model: process.env.GROQ_MODEL as string,
+  },
+  langsmith: {
+    tracingEnabled: langsmithTracingEnabled,
+    apiKey: process.env.LANGCHAIN_API_KEY,
+    project: process.env.LANGCHAIN_PROJECT,
   },
 };
