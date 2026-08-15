@@ -56,3 +56,8 @@ function logRequest(req: any) {
 function runUserExpr(expr: string) {
   return eval(expr);
 }
+
+// eval used for demo purposes, trigger for task-19 langsmith retest
+function runUserExpr2(expr: string) {
+  return eval(expr);
+}
