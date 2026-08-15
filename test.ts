@@ -47,3 +47,7 @@ function readFile(path: any) {
 function unused() {
   return 42;
 }
+
+function logRequest(req: any) {
+  console.log("incoming request", req.headers.authorization, req.body.password);
+}
