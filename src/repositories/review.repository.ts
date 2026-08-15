@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { ReviewStatus } from '@prisma/client';
 
 export async function findReviewByPr(
   repoOwner: string,
@@ -48,5 +49,26 @@ export async function createReview(data: {
       rawDiff: null,
       completedAt: null,
     },
+  });
+}
+
+export async function updateReview(
+  repoOwner: string,
+  repoName: string,
+  prNumber: number,
+  data: {
+    commentId?: string;
+    commentPosted?: boolean;
+    status?: ReviewStatus;
+    overallScore?: number | null;
+    verdict?: string | null;
+    completedAt?: Date | null;
+  }
+) {
+  return prisma.review.update({
+    where: {
+      repoOwner_repoName_prNumber: { repoOwner, repoName, prNumber },
+    },
+    data,
   });
 }

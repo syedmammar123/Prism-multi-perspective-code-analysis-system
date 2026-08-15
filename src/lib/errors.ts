@@ -25,3 +25,7 @@ export function UnauthorizedError(message: string): AppError {
 export function NotFoundError(message: string): AppError {
   return createAppError(message, 404);
 }
+
+export function AgentOutputError(message: string): AppError {
+  return createAppError(message, 500);
+}
