@@ -3,6 +3,7 @@ import { verifySignature } from '../../lib/hmac';
 import { config } from '../../config';
 import { logger } from '../../lib/logger';
 import { addReviewJob } from '../../jobs/producer';
+import { findReviewByPr, createReview } from '../../repositories/review.repository';
 
 const HANDLED_ACTIONS = new Set(['opened', 'synchronize']);
 
@@ -28,13 +29,30 @@ export async function webhookController(req: Request, res: Response) {
     return;
   }
 
-  await addReviewJob({
-    prNumber: pullRequest.number,
-    repoOwner: repository.owner.login,
-    repoName: repository.name,
+  const prNumber = pullRequest.number;
+  const repoOwner = repository.owner.login;
+  const repoName = repository.name;
+
+  const existing = await findReviewByPr(repoOwner, repoName, prNumber);
+
+  if (existing && (existing.status === 'QUEUED' || existing.status === 'PROCESSING')) {
+    logger.info(
+      { repoOwner, repoName, prNumber },
+      'Duplicate webhook: review already in flight, skipping'
+    );
+    res.status(200).end();
+    return;
+  }
+
+  await createReview({
+    repoOwner,
+    repoName,
+    prNumber,
+    prTitle: pullRequest.title,
+    prAuthor: pullRequest.user.login,
   });
 
-  // TODO: idempotency check once repositories/review.repository.ts exists
+  await addReviewJob({ prNumber, repoOwner, repoName });
 
   res.status(202).end();
 }

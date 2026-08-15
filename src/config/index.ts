@@ -10,6 +10,9 @@ const REQUIRED_ENV_VARS = [
   'GITHUB_WEBHOOK_SECRET',
   'DATABASE_URL',
   'REDIS_URL',
+  'LLM_PROVIDER',
+  'GROQ_API_KEY',
+  'GROQ_MODEL',
 ] as const;
 
 const missingVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
@@ -30,4 +33,9 @@ export const config = {
   },
   databaseUrl: process.env.DATABASE_URL as string,
   redisUrl: process.env.REDIS_URL as string,
+  llmProvider: process.env.LLM_PROVIDER as string,
+  groq: {
+    apiKey: process.env.GROQ_API_KEY as string,
+    model: process.env.GROQ_MODEL as string,
+  },
 };
