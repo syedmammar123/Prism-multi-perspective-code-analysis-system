@@ -8,8 +8,6 @@ An automated PR reviewer for GitHub. When a pull request is opened or updated on
 
 ![System design diagram of the AI Code Review Agent](system-design.png)
 
-Full architecture rationale, day-by-day build log, and design decisions live in this repo's local planning notes (not published, see [Project notes](#project-notes)).
-
 ---
 
 ## Setup
