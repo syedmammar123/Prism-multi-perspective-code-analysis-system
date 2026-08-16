@@ -2,6 +2,8 @@
 
 An automated PR reviewer for GitHub. When a pull request is opened or updated on a configured repo, this system fetches the diff, runs three specialized AI agents (code quality, security, performance) against it, with retrieval-augmented context from the repo's own coding guidelines, and posts a structured review comment directly on the PR, usually within about a minute.
 
+**[Live Demo →](https://pr-review-agent-b0zu.onrender.com/)**
+
 ---
 
 ## How it works
