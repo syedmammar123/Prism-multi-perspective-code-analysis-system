@@ -35,6 +35,8 @@ if (
   );
 }
 
+const DEFAULT_EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
+
 export const config = {
   port: Number(process.env.PORT),
   nodeEnv: process.env.NODE_ENV as string,
@@ -58,4 +60,5 @@ export const config = {
     // than a Personal Access Token.
     workspaceId: process.env.LANGSMITH_WORKSPACE_ID,
   },
+  embeddingModel: process.env.EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
 };

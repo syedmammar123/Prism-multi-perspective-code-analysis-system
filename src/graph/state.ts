@@ -1,6 +1,7 @@
 import { Annotation } from '@langchain/langgraph';
 import { FileChunk } from '../integrations/github/diff-parser';
 import { AgentReviewOutput } from '../agents/types';
+import { GuidelineMatch } from '../rag/retriever';
 
 export const StateAnnotation = Annotation.Root({
   // Input (set by webhook handler / caller)
@@ -15,6 +16,9 @@ export const StateAnnotation = Annotation.Root({
 
   // Set by parse-and-chunk node
   fileChunks: Annotation<FileChunk[]>,
+
+  // Set by retrieve-guidelines node
+  guidelines: Annotation<GuidelineMatch[]>,
 
   // Set by agents (Task 15 — each writes only its own key)
   qualityReview: Annotation<AgentReviewOutput | null>,

@@ -35,23 +35,28 @@ function computeVerdict(findings: Finding[]): 'REJECTED' | 'NEEDS CHANGES' | 'AP
 
 function agentSection(name: string, review: AgentReviewOutput | null): string {
   if (!review) return `### ${name}\n\n_Agent did not run._`;
+  if (review.failed) {
+    const reason = review.findings[0]?.description ?? 'Unknown error.';
+    return `### ${name}\n\n> **Note:** The ${name} review could not be completed and is excluded from this analysis.\n>\n> ${reason}`;
+  }
   return `### ${name} (score: ${review.score}/10)\n\n${groupBySeverity(review.findings)}`;
 }
 
 export async function synthesizerNode(
   state: typeof StateAnnotation.State
 ): Promise<Partial<typeof StateAnnotation.State>> {
-  const { qualityReview, securityReview, performanceReview } = state;
-
-  const allFindings = [
-    ...(qualityReview?.findings ?? []),
-    ...(securityReview?.findings ?? []),
-    ...(performanceReview?.findings ?? []),
+  const reviews = [
+    { name: 'Code Quality', review: state.qualityReview },
+    { name: 'Security', review: state.securityReview },
+    { name: 'Performance', review: state.performanceReview },
   ];
 
-  const scores = [qualityReview?.score, securityReview?.score, performanceReview?.score].filter(
-    (s): s is number => typeof s === 'number'
-  );
+  const succeeded = reviews.filter((r) => r.review && !r.review.failed);
+  const failed = reviews.filter((r) => r.review?.failed);
+
+  const allFindings = succeeded.flatMap((r) => r.review!.findings);
+
+  const scores = succeeded.map((r) => r.review!.score);
   const overallScore =
     scores.length > 0
       ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
@@ -65,16 +70,21 @@ export async function synthesizerNode(
       ? mustFix.map(formatFinding).join('\n')
       : '_Nothing blocking — no critical or high severity findings._';
 
+  const failureNote =
+    failed.length > 0
+      ? `\n**Note:** ${failed.map((f) => f.name).join(', ')} review${failed.length > 1 ? 's' : ''} could not be completed and ${failed.length > 1 ? 'are' : 'is'} excluded from this analysis.\n`
+      : '';
+
   const finalReview = `## Code Review Summary
 
 **Verdict:** ${verdict}
 **Overall Score:** ${overallScore}/10
+${failureNote}
+${agentSection('Code Quality', state.qualityReview)}
 
-${agentSection('Code Quality', qualityReview)}
+${agentSection('Security', state.securityReview)}
 
-${agentSection('Security', securityReview)}
-
-${agentSection('Performance', performanceReview)}
+${agentSection('Performance', state.performanceReview)}
 
 ## Must Fix Before Merge
 

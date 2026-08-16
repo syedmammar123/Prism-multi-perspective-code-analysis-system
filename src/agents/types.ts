@@ -12,4 +12,5 @@ export interface Finding {
 export interface AgentReviewOutput {
   score: number;
   findings: Finding[];
+  failed?: boolean;
 }
