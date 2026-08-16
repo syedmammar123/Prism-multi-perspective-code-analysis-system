@@ -10,4 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping health endpoint
-        run: curl -sf --max-time 10 "${{ vars.RENDER_APP_URL }}/health"
+        run: |
+          curl -sf --max-time 30 --retry 1 --retry-all-errors --retry-delay 10 \
+            "${{ vars.RENDER_APP_URL }}/health"
