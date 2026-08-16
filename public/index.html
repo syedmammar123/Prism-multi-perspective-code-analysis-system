@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRISM: AI PR Reviewer</title>
+<meta name="description" content="PRISM runs three specialized AI agents against every pull request and posts a structured code review comment automatically.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAF9;
+    --surface: #FFFFFF;
+    --ink: #0D0F12;
+    --ink-muted: #5B6470;
+    --ink-faint: #8A93A0;
+    --border: #E3E4E0;
+    --green: #1A7F37;
+    --green-bg: #EAF6EE;
+    --red: #C4362E;
+    --red-bg: #FCEEED;
+    --amber: #9A6700;
+    --amber-bg: #FBF2DD;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  a { color: inherit; }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Header */
+
+  header {
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .brand-mark {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+  }
+
+  .nav-link {
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .nav-link:hover {
+    border-color: var(--ink);
+    background: var(--surface);
+  }
+
+  /* Hero */
+
+  .hero {
+    padding: 72px 0 56px;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-faint);
+    margin-bottom: 18px;
+  }
+
+  h1.headline {
+    font-size: clamp(32px, 4.4vw, 46px);
+    line-height: 1.12;
+    max-width: 15ch;
+  }
+
+  .sub {
+    margin-top: 20px;
+    font-size: 17px;
+    color: var(--ink-muted);
+    max-width: 56ch;
+  }
+
+  .hero-links {
+    margin-top: 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid transparent;
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .btn-primary:hover { background: #24272C; }
+
+  .btn-secondary {
+    border-color: var(--border);
+    color: var(--ink);
+  }
+
+  .btn-secondary:hover { border-color: var(--ink); }
+
+  /* Example label */
+
+  .example-label {
+    margin: 44px 0 12px;
+  }
+
+  /* Diff viewer */
+
+  .diff-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    background: var(--surface);
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  .stat {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    flex-shrink: 0;
+  }
+
+  .stat-add { color: var(--green); }
+
+  .diff-file {
+    border: 1px solid var(--border);
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(13,15,18,0.04);
+  }
+
+  .diff-file-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .diff-file-head .filename {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .diff-body {
+    overflow-x: auto;
+    background: var(--green-bg);
+  }
+
+  .dline {
+    display: flex;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 20px;
+    white-space: pre;
+  }
+
+  .dline-no {
+    flex: 0 0 44px;
+    text-align: right;
+    padding-right: 10px;
+    color: var(--ink-faint);
+    user-select: none;
+    border-right: 1px solid rgba(26,127,55,0.15);
+  }
+
+  .dline-mark {
+    flex: 0 0 20px;
+    text-align: center;
+    color: var(--green);
+    user-select: none;
+  }
+
+  .dline-code {
+    padding-left: 6px;
+    padding-right: 16px;
+    color: var(--ink);
+  }
+
+  .tok-kw { color: #6E56CF; }
+  .tok-str { color: #0B7285; }
+
+  /* Review panel */
+
+  .review-panel {
+    margin-top: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(13,15,18,0.04);
+  }
+
+  .review-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #FCFCFB;
+  }
+
+  .review-who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .review-meta { font-size: 13.5px; }
+
+  .review-meta .author-name { font-weight: 600; }
+
+  .review-meta .review-verb,
+  .review-meta .time {
+    color: var(--ink-faint);
+  }
+
+  .verdict {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: var(--red-bg);
+    color: var(--red);
+    white-space: nowrap;
+  }
+
+  .review-body {
+    padding: 22px 24px 26px;
+  }
+
+  .score-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2px 0 26px;
+    font-size: 13.5px;
+  }
+
+  .score-table th,
+  .score-table td {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .score-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    color: var(--ink-faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .score-table td.num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+  }
+
+  .score-table tr:last-child td {
+    font-weight: 700;
+    border-bottom: none;
+  }
+
+  .finding-group {
+    margin-bottom: 18px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .finding-group.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .finding-group:last-child { margin-bottom: 0; }
+
+  .finding-group h3 {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .finding-score {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+
+  .finding {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .finding:first-of-type { border-top: none; }
+
+  .finding-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .sev {
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    height: fit-content;
+    white-space: nowrap;
+  }
+
+  .sev-critical { background: var(--red-bg); color: var(--red); }
+  .sev-high { background: var(--red-bg); color: var(--red); }
+  .sev-medium { background: var(--amber-bg); color: var(--amber); }
+  .sev-low { background: #EEF0F2; color: var(--ink-muted); }
+
+  .finding-body .loc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  .finding-body .desc {
+    margin-top: 2px;
+    color: var(--ink);
+  }
+
+  .must-fix {
+    margin-top: 22px;
+    padding: 16px 18px;
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    background: var(--red-bg);
+  }
+
+  .must-fix h3 {
+    font-size: 14px;
+    color: var(--red);
+    margin-bottom: 10px;
+  }
+
+  .must-fix ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .must-fix li {
+    font-size: 13.5px;
+    margin-bottom: 7px;
+    overflow-wrap: anywhere;
+  }
+
+  .must-fix li:last-child { margin-bottom: 0; }
+
+  .must-fix .loc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-left: 2px;
+  }
+
+  /* Sections */
+
+  section.block {
+    padding: 56px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .section-head {
+    margin-bottom: 30px;
+  }
+
+  .section-head .eyebrow { margin-bottom: 10px; }
+
+  .section-head h2 {
+    font-size: 26px;
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 26px;
+  }
+
+  .tag-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background: var(--green-bg);
+    color: var(--green);
+  }
+
+  .diagram {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 16px;
+  }
+
+  .diagram img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 4px;
+  }
+
+  .pipeline {
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .pipeline li {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    padding: 12px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    margin-right: 20px;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  }
+
+  .pipeline li:hover {
+    border-color: var(--ink);
+    background: #FCFCFB;
+    transform: translateY(-1px);
+  }
+
+  .pipeline li:last-child { margin-right: 0; }
+
+  .pipeline li:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -20px;
+    width: 14px;
+    border-top: 1.5px dashed var(--ink-faint);
+    transform: translateY(-50%);
+  }
+
+  .pipeline li:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -22px;
+    width: 0;
+    height: 0;
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+    border-left: 4px solid var(--ink-faint);
+    transform: translateY(-50%);
+  }
+
+  .pipeline li .step-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .pipeline li .step-name {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* Stack */
+
+  .stack-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .stack-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink-muted);
+    background: var(--surface);
+  }
+
+  /* Footer */
+
+  footer {
+    padding: 40px 0 60px;
+    border-top: 1px solid var(--border);
+  }
+
+  footer .wrap {
+    font-size: 13.5px;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 560px) {
+    .hero { padding: 48px 0 40px; }
+    .review-body { padding: 18px; }
+  }
+
+  @media (max-width: 760px) {
+    .pipeline { flex-direction: column; align-items: stretch; }
+    .pipeline li { flex: 0 0 auto; margin: 0 0 22px; }
+    .pipeline li:last-child { margin-bottom: 0; }
+    .pipeline li:not(:last-child)::after {
+      top: 100%;
+      right: auto;
+      bottom: auto;
+      left: 19px;
+      margin-top: 3px;
+      width: 0;
+      height: 10px;
+      border-top: none;
+      border-left: 1.5px dashed var(--ink-faint);
+      transform: none;
+    }
+    .pipeline li:not(:last-child)::before {
+      top: 100%;
+      right: auto;
+      bottom: auto;
+      left: 15px;
+      margin-top: 10px;
+      width: 8px;
+      height: 8px;
+      border-top: none;
+      border-left: none;
+      border-right: 1.5px solid var(--ink-faint);
+      border-bottom: 1.5px solid var(--ink-faint);
+      transform: rotate(45deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .finding-group {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <span class="brand-mark">PRISM</span>
+    </div>
+    <a class="nav-link" href="https://github.com/syedmammar123/Prism-multi-perspective-code-analysis-system" target="_blank" rel="noopener">
+      GitHub ↗
+    </a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div class="eyebrow">automated pull request review</div>
+      <h1 class="headline">Three AI reviewers read your pull request before your teammates do.</h1>
+      <p class="sub">
+        When a PR opens or updates, PRISM fetches the diff, runs code quality, security and performance
+        agents against it in parallel, grounds each finding in the repo's own coding guidelines, and posts
+        a structured review comment, usually within about a minute.
+      </p>
+      <div class="hero-links">
+        <a class="btn btn-primary" href="https://github.com/syedmammar123/Prism-multi-perspective-code-analysis-system" target="_blank" rel="noopener">
+          View source
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">retrieval-augmented, multi-agent pipeline</div>
+        <h2>Three agents. One shared context. One verdict.</h2>
+      </div>
+      <div class="tag-list">
+        <span class="tag-item">RAG</span>
+        <span class="tag-item">Multi-agent orchestration</span>
+        <span class="tag-item">LangGraph</span>
+        <span class="tag-item">Parallel fan-out</span>
+      </div>
+      <div class="diagram">
+        <img src="/system-design.png" alt="PRISM system design diagram: webhook receives PR event, job is queued, worker fetches the diff, retrieves relevant coding guidelines, runs three parallel agents, synthesizes findings, and posts a comment on the PR." loading="lazy">
+      </div>
+      <ol class="pipeline">
+        <li><span class="step-num">01</span><span class="step-name">PR event ingested</span></li>
+        <li><span class="step-num">02</span><span class="step-name">Review job queued</span></li>
+        <li><span class="step-num">03</span><span class="step-name">Diff fetched from GitHub</span></li>
+        <li><span class="step-num">04</span><span class="step-name">RAG retrieval over coding guidelines</span></li>
+        <li><span class="step-num">05</span><span class="step-name">3 parallel LLM agents (LangGraph fan-out)</span></li>
+        <li><span class="step-num">06</span><span class="step-name">Findings synthesized</span></li>
+        <li><span class="step-num">07</span><span class="step-name">Review comment posted</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="eyebrow example-label">example finding</div>
+
+      <div class="diff-toolbar">
+        <span>Files changed &middot; 1 file</span>
+        <span class="stat"><span class="stat-add">+53</span> &minus;0</span>
+      </div>
+      <div class="diff-file" aria-label="Diff of transactionNotifier.ts">
+        <div class="diff-file-head">
+          <span class="filename">src/services/transactionNotifier.ts</span>
+          <span class="stat"><span class="stat-add">+53</span> &minus;0</span>
+        </div>
+        <div class="diff-body">
+          <div class="dline"><span class="dline-no">1</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">const</span> STRIPE_SECRET_KEY = <span class="tok-str">"sk_live_51Hc9f7GkA3mZq8pXyZ9nT2vLwQeRt6uYiO1pAsD3fGh"</span>;</span></div>
+          <div class="dline"><span class="dline-no">2</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">3</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> fetchAccountById(id: any) {</span></div>
+          <div class="dline"><span class="dline-no">4</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">const</span> query = <span class="tok-str">"SELECT * FROM accounts WHERE id = "</span> + id;</span></div>
+          <div class="dline"><span class="dline-no">5</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> db.query(query);</span></div>
+          <div class="dline"><span class="dline-no">6</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">7</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">8</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> verifyPin(userId: any, pin: any) {</span></div>
+          <div class="dline"><span class="dline-no">9</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;console.log(<span class="tok-str">"pin attempt"</span>, userId, pin);</span></div>
+          <div class="dline"><span class="dline-no">10</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">if</span> (pin == <span class="tok-str">"0000"</span>) {</span></div>
+          <div class="dline"><span class="dline-no">11</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;<span class="tok-kw">return</span> <span class="tok-kw">true</span>;</span></div>
+          <div class="dline"><span class="dline-no">12</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;}</span></div>
+          <div class="dline"><span class="dline-no">13</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> <span class="tok-kw">false</span>;</span></div>
+          <div class="dline"><span class="dline-no">14</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">15</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">16</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> calc(a, b, c) {</span></div>
+          <div class="dline"><span class="dline-no">17</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">var</span> x;</span></div>
+          <div class="dline"><span class="dline-no">18</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">if</span> (c == 1) {</span></div>
+          <div class="dline"><span class="dline-no">19</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;x = a + b;</span></div>
+          <div class="dline"><span class="dline-no">20</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;} <span class="tok-kw">else</span> {</span></div>
+          <div class="dline"><span class="dline-no">21</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;x = a - b;</span></div>
+          <div class="dline"><span class="dline-no">22</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;}</span></div>
+          <div class="dline"><span class="dline-no">23</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> x;</span></div>
+          <div class="dline"><span class="dline-no">24</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">25</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">26</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> findDuplicateTransactions(txns: any[]) {</span></div>
+          <div class="dline"><span class="dline-no">27</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">const</span> dupes = [];</span></div>
+          <div class="dline"><span class="dline-no">28</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">for</span> (<span class="tok-kw">let</span> i = 0; i &lt; txns.length; i++) {</span></div>
+          <div class="dline"><span class="dline-no">29</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;<span class="tok-kw">for</span> (<span class="tok-kw">let</span> j = 0; j &lt; txns.length; j++) {</span></div>
+          <div class="dline"><span class="dline-no">30</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="tok-kw">if</span> (i !== j &amp;&amp; txns[i].id === txns[j].id) {</span></div>
+          <div class="dline"><span class="dline-no">31</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dupes.push(txns[i]);</span></div>
+          <div class="dline"><span class="dline-no">32</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></div>
+          <div class="dline"><span class="dline-no">33</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;&nbsp;&nbsp;}</span></div>
+          <div class="dline"><span class="dline-no">34</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;}</span></div>
+          <div class="dline"><span class="dline-no">35</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> dupes;</span></div>
+          <div class="dline"><span class="dline-no">36</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">37</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">38</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> loadStatement(path: any) {</span></div>
+          <div class="dline"><span class="dline-no">39</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">const</span> fs = require(<span class="tok-str">"fs"</span>);</span></div>
+          <div class="dline"><span class="dline-no">40</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> fs.readFileSync(<span class="tok-str">"/data/statements/"</span> + path, <span class="tok-str">"utf8"</span>);</span></div>
+          <div class="dline"><span class="dline-no">41</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">42</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">43</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> unusedLegacyCheck() {</span></div>
+          <div class="dline"><span class="dline-no">44</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> <span class="tok-kw">true</span>;</span></div>
+          <div class="dline"><span class="dline-no">45</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">46</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">47</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> logIncomingWebhook(req: any) {</span></div>
+          <div class="dline"><span class="dline-no">48</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;console.log(<span class="tok-str">"incoming webhook"</span>, req.headers.authorization, req.body.accountNumber);</span></div>
+          <div class="dline"><span class="dline-no">49</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+          <div class="dline"><span class="dline-no">50</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;</span></div>
+          <div class="dline"><span class="dline-no">51</span><span class="dline-mark">+</span><span class="dline-code"><span class="tok-kw">function</span> evaluateTransferRule(expr: string) {</span></div>
+          <div class="dline"><span class="dline-no">52</span><span class="dline-mark">+</span><span class="dline-code">&nbsp;&nbsp;<span class="tok-kw">return</span> eval(expr);</span></div>
+          <div class="dline"><span class="dline-no">53</span><span class="dline-mark">+</span><span class="dline-code">}</span></div>
+        </div>
+      </div>
+
+      <div class="review-panel" aria-label="Example PRISM review comment">
+        <div class="review-head">
+          <div class="review-who">
+            <span class="avatar">P</span>
+            <span class="review-meta"><span class="author-name">PRISM</span> <span class="review-verb">reviewed</span> <span class="time">just now</span></span>
+          </div>
+          <span class="verdict">REJECTED</span>
+        </div>
+        <div class="review-body">
+          <table class="score-table">
+            <thead>
+              <tr><th>Agent</th><th>Score</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Code Quality</td><td class="num">3/10</td></tr>
+              <tr><td>Security</td><td class="num">0/10</td></tr>
+              <tr><td>Performance</td><td class="num">2/10</td></tr>
+              <tr><td>Overall</td><td class="num">1.7/10</td></tr>
+            </tbody>
+          </table>
+
+          <div class="finding-group">
+            <h3>Code Quality <span class="finding-score">3/10</span></h3>
+            <div class="finding">
+              <span class="sev sev-medium">medium</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:16</div>
+                <div class="desc">Unclear function and parameter names in <span class="mono">calc(a, b, c)</span> obscure what it computes. Suggestion: rename to something like <span class="mono">computeAdjustedBalance</span> with descriptive parameters.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-medium">medium</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:39</div>
+                <div class="desc">Per <span class="mono">api-patterns.md</span>, imports should be declared at the top of the file, not required inline inside a function. Suggestion: move <span class="mono">fs</span> to the top-level imports.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-low">low</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:43</div>
+                <div class="desc"><span class="mono">unusedLegacyCheck</span> is dead code, not referenced anywhere in the file. Suggestion: remove it.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="finding-group">
+            <h3>Security <span class="finding-score">0/10</span></h3>
+            <div class="finding">
+              <span class="sev sev-critical">critical</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:1</div>
+                <div class="desc">Live Stripe secret key committed to source. Per <span class="mono">security-checklist.md</span>, secrets must be loaded from environment variables, never committed. Suggestion: rotate the key and load it via <span class="mono">process.env.STRIPE_SECRET_KEY</span>.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-critical">critical</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:52</div>
+                <div class="desc"><span class="mono">evaluateTransferRule</span> passes a string directly to <span class="mono">eval</span>, allowing arbitrary code execution if <span class="mono">expr</span> is ever influenced by user input. Suggestion: replace with a constrained expression parser.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-high">high</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:4</div>
+                <div class="desc"><span class="mono">fetchAccountById</span> concatenates <span class="mono">id</span> directly into a SQL query string (SQL injection). Suggestion: use a parameterized query.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-high">high</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:10</div>
+                <div class="desc"><span class="mono">verifyPin</span> compares against a hardcoded literal PIN, effectively a backdoor. Suggestion: compare against the account's stored, hashed PIN.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-high">high</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:40</div>
+                <div class="desc"><span class="mono">loadStatement</span> builds a file path from unsanitized input, allowing path traversal outside the statements directory. Suggestion: resolve and validate the path stays within the intended directory.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-medium">medium</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:48</div>
+                <div class="desc"><span class="mono">logIncomingWebhook</span> logs the authorization header and account number in plaintext. Suggestion: redact sensitive fields before logging.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="finding-group">
+            <h3>Performance <span class="finding-score">2/10</span></h3>
+            <div class="finding">
+              <span class="sev sev-high">high</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:26</div>
+                <div class="desc"><span class="mono">findDuplicateTransactions</span> is O(n&sup2;) due to nested loops over the transaction list. Suggestion: use a Set or Map keyed by transaction id for O(n) lookup.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <span class="sev sev-medium">medium</span>
+              <div class="finding-body">
+                <div class="loc">transactionNotifier.ts:40</div>
+                <div class="desc"><span class="mono">fs.readFileSync</span> blocks the event loop in a request-handling path. Suggestion: use <span class="mono">fs.promises.readFile</span>.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="must-fix">
+            <h3>Must Fix Before Merge</h3>
+            <ul>
+              <li>Live secret key committed to source <span class="loc">transactionNotifier.ts:1</span></li>
+              <li>Arbitrary code execution via <span class="mono">eval</span> <span class="loc">transactionNotifier.ts:52</span></li>
+              <li>SQL injection in <span class="mono">fetchAccountById</span> <span class="loc">transactionNotifier.ts:4</span></li>
+              <li>Hardcoded PIN bypass in <span class="mono">verifyPin</span> <span class="loc">transactionNotifier.ts:10</span></li>
+              <li>Path traversal in <span class="mono">loadStatement</span> <span class="loc">transactionNotifier.ts:40</span></li>
+              <li>O(n&sup2;) duplicate-transaction loop <span class="loc">transactionNotifier.ts:26</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">built with</div>
+        <h2>Tech stack</h2>
+      </div>
+      <div class="stack-list">
+        <span class="stack-item">Node.js</span>
+        <span class="stack-item">Express</span>
+        <span class="stack-item">LangGraph</span>
+        <span class="stack-item">BullMQ</span>
+        <span class="stack-item">Redis / Upstash</span>
+        <span class="stack-item">Postgres + pgvector</span>
+        <span class="stack-item">Neon</span>
+        <span class="stack-item">Prisma</span>
+        <span class="stack-item">Groq</span>
+        <span class="stack-item">Octokit</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>PRISM: AI PR Reviewer</span>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.finding-group').forEach(function (el, i) {
+    setTimeout(function () {
+      el.classList.add('in-view');
+    }, 220 + i * 260);
+  });
+</script>
+
+</body>
+</html>
